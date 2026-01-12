@@ -12,7 +12,7 @@ For years, OpenShift BuildConfig has been the go-to solution for building contai
 
 [**OpenShift Builds**](https://github.com/redhat-openshift-builds/) is Red Hat's extensible build framework for building container images on OpenShift. It is based on [**Shipwright**](https://github.com/shipwright-io/), the upstream open-source project that provides a vendor-neutral framework for building container images on Kubernetes.
 
-Built on top of Openshift Pipelines (Tekton), Openshift Builds offers a flexible, extensible approach to container builds with enterprise support from Red Hat.
+Built on top of OpenShift Pipelines (Tekton), OpenShift Builds offers a flexible, extensible approach to container builds with enterprise support from Red Hat.
 
 Today, we're excited to announce a **Developer Preview** of BuildConfig to OpenShift Builds migration support **using [Crane](https://github.com/migtools/crane)**. This new upstream capability in Crane enables you to automatically convert your existing OpenShift BuildConfig resources to OpenShift Builds resources.
 
@@ -61,7 +61,7 @@ The tool intelligently handles all major source types:
 
 ## How It Works
 
-The migration process follows a following workflow:
+The migration process follows this workflow:
 
 1. **Discovery**: Crane connects to your cluster and lists all BuildConfigs in the specified namespace
 2. **Analysis**: Each BuildConfig is analyzed for its strategy type, source configuration, and output settings
@@ -76,7 +76,7 @@ Ready to try the Developer Preview? Here's how to get started:
 
 ### Prerequisites
 
-1. Openshift Pipelines installed on your cluster
+1. OpenShift Pipelines installed on your cluster
 2. OpenShift Builds installed on your cluster
 
 ---
@@ -89,8 +89,8 @@ Let's walk through a complete migration example step by step.
 
 Let's take an example of the following BuildConfig (`ruby_docker_git_buildconfig.yaml`):
 
-- **`spec.source`** is of Git type and defines a GitHub URI and branch. Source also defines context directory, inline dockerfile, secrets, and configMaps which are available in the builder pod during the build process.
-- **`spec.strategy`** is of Docker type, defines a `from` image which overrides the builder image in the project's Dockerfile. It also defines a pull secret to pull images from a private registry, flags (`noCache`, `forcePull`, `imageOptimizationPolicy`), volumes, environment variables, and build args.
+- **`spec.source`** is of Git type and defines a GitHub URI and branch. It also defines context directory, inline Dockerfile, secrets, and configMaps which are available in the builder pod during the build process.
+- **`spec.strategy`** is of Docker type and defines a `from` image which overrides the builder image in the project's Dockerfile. It also defines a pull secret to pull images from a private registry, flags (`noCache`, `forcePull`, `imageOptimizationPolicy`), volumes, environment variables, and build args.
 
 > **Note:** The `git.uri` field (`https://github.com/psrvere/ruby-hello-world`) points to a sample source code repository for this example. The `quay.io/prathore/ruby-27:latest` image is a private registry that you will not have access to. Please substitute your own source repository and registry credentials to try this example.
 
@@ -256,7 +256,7 @@ spec:
 
 First, check if there's a need to modify generated files. In our case, we may need to modify the output image. Although ImageStreams have been migrated to a correct URL in the generated file, this feature is not fully supported yet (see warnings).
 
-You can change output image to any public regitry.
+You can change the output image to any public registry.
 
 **Create a BuildRun resource** (`ruby_docker_buildrun.yaml`):
 
@@ -302,6 +302,6 @@ For questions or issues, please [open an issue](https://github.com/migtools/cran
 - **OpenShift Builds GitHub**: [https://github.com/redhat-openshift-builds/](https://github.com/redhat-openshift-builds/)
 - **Shipwright (Upstream) GitHub**: [https://github.com/shipwright-io/](https://github.com/shipwright-io/)
 - **Shipwright Documentation**: [https://shipwright.io/docs/](https://shipwright.io/docs/)
-- **Crane Migration Demo**:: [https://www.youtube.com/watch?v=6Z7brDRwF8s](https://www.youtube.com/watch?v=6Z7brDRwF8s)
+- **Crane Migration Demo**: [https://www.youtube.com/watch?v=6Z7brDRwF8s](https://www.youtube.com/watch?v=6Z7brDRwF8s)
 
 ---
