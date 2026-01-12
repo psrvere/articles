@@ -1,6 +1,6 @@
-# OpenShift Builds Migration Tool for BuildConfig Resources
+# Migrating BuildConfigs to OpenShift Builds Using Crane
 
-**Automatically convert OpenShift BuildConfigs to OpenShift Builds and embrace the next generation of container build infrastructure**
+**Use Crane to automatically convert your OpenShift BuildConfig resources to OpenShift Builds and embrace the next generation of container build infrastructure**
 
 > 🚀 **Developer Preview**: This feature is now available for early adopters! Try it out and let us know what you think.
 
@@ -14,15 +14,17 @@ For years, OpenShift BuildConfig has been the go-to solution for building contai
 
 Built on top of Openshift Pipelines (Tekton), Openshift Builds offers a flexible, extensible approach to container builds with enterprise support from Red Hat.
 
-Today, we're excited to announce a **Developer Preview** of BuildConfig to OpenShift Builds migration support in [Crane](https://github.com/migtools/crane) — a utility designed to automatically convert your existing OpenShift BuildConfig resources to OpenShift Builds resources.
+Today, we're excited to announce a **Developer Preview** of BuildConfig to OpenShift Builds migration support **using [Crane](https://github.com/migtools/crane)**. This new upstream capability in Crane enables you to automatically convert your existing OpenShift BuildConfig resources to OpenShift Builds resources.
 
 ---
 
 ## What is Crane?
 
-[Crane](https://github.com/migtools/crane) is a migration tool under the [Konveyor](https://www.konveyor.io/) community that helps application owners migrate Kubernetes workloads and their state between clusters. It designed on Extract, Transform and Apply framework.
+[Crane](https://github.com/migtools/crane) is an open-source migration tool under the [Konveyor](https://www.konveyor.io/) community that helps application owners migrate Kubernetes workloads and their state between clusters. It is designed on an Extract, Transform, and Apply framework.
 
 With this new BuildConfig conversion capability, Crane extends its migration toolkit to help organizations modernize their container build infrastructure.
+
+> ⚠️ **Developer Preview Notice**: This BuildConfig migration feature is currently available as an **upstream community capability** in Crane. It is not yet included in official Red Hat product offerings. As a Developer Preview, it is intended for evaluation and feedback purposes and is not supported for production use.
 
 ---
 
@@ -90,7 +92,7 @@ Let's take an example of the following BuildConfig (`ruby_docker_git_buildconfig
 - **`spec.source`** is of Git type and defines a GitHub URI and branch. Source also defines context directory, inline dockerfile, secrets, and configMaps which are available in the builder pod during the build process.
 - **`spec.strategy`** is of Docker type, defines a `from` image which overrides the builder image in the project's Dockerfile. It also defines a pull secret to pull images from a private registry, flags (`noCache`, `forcePull`, `imageOptimizationPolicy`), volumes, environment variables, and build args.
 
-> **Note:** You will not have access to `quay.io/prathore/ruby-27:latest` private registry. Please create your own along with a valid secret to try this example.
+> **Note:** The `git.uri` field (`https://github.com/psrvere/ruby-hello-world`) points to a sample source code repository for this example. The `quay.io/prathore/ruby-27:latest` image is a private registry that you will not have access to. Please substitute your own source repository and registry credentials to try this example.
 
 ```yaml
 apiVersion: build.openshift.io/v1
@@ -279,7 +281,17 @@ oc get buildrun
 
 ---
 
-If you prefer video format, you can also view a video [demo](https://www.youtube.com/watch?v=6Z7brDRwF8s). We encourage you to try the Developer Preview and share your feedback as we work toward general availability.
+If you prefer video format, you can also view a video [demo](https://www.youtube.com/watch?v=6Z7brDRwF8s).
+
+---
+
+## Current Availability & Support
+
+This BuildConfig migration capability is currently available as an **upstream Developer Preview** in the [Crane project](https://github.com/migtools/crane)
+
+This feature is not yet included in official Red Hat product offerings. We encourage you to try the Developer Preview and share your feedback as we work toward broader availability.
+
+For questions or issues, please [open an issue](https://github.com/migtools/crane/issues) on the Crane GitHub repository.
 
 ---
 
@@ -293,5 +305,3 @@ If you prefer video format, you can also view a video [demo](https://www.youtube
 - **Crane Migration Demo**:: [https://www.youtube.com/watch?v=6Z7brDRwF8s](https://www.youtube.com/watch?v=6Z7brDRwF8s)
 
 ---
-
-*Have questions or feedback? [Open an issue](https://github.com/migtools/crane/issues) on the Crane GitHub repository.
