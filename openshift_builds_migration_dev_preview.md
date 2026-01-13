@@ -165,9 +165,15 @@ oc get build
 
 ### Step 3: Download Crane CLI
 
-Download the latest Crane CLI tool from [TO BE UPDATED](https://github.com/migtools/crane/releases/) for your platform.
+Download the latest Crane CLI tool by running the following command:
 
-<!-- TBD: Add curl commands after release and testing of crane binary. -->
+```bash
+curl -fsSL https://raw.githubusercontent.com/psrvere/download-crane/main/download-crane.sh | bash
+```
+
+This script will automatically detect your platform and download the appropriate Crane binary.
+
+Alternatively, you can manually download the binary for your platform from the [Crane Releases](https://github.com/migtools/crane/releases/) page.
 
 ### Step 4: Run the Migration
 
