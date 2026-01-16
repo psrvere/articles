@@ -1,0 +1,437 @@
+<!--
+DRUPAL BLOG SUBMISSION CONTENT
+==============================
+
+TITLE (60 char limit):
+Migrating BuildConfigs to OpenShift Builds Using Crane
+
+SUMMARY (1-2 sentences):
+Learn how to use Crane to automatically convert your OpenShift BuildConfig resources to OpenShift Builds
+
+SUBTITLE (optional):
+Use Crane to embrace the next generation of container build infrastructure
+
+BODY (HTML content below):
+-->
+
+<style>
+p code, li code {
+  font-size: 0.9em;
+}
+</style>
+
+<hr>
+<h2>
+    Introduction
+</h2>
+<p>
+    For years, OpenShift BuildConfig has been the go-to solution for building container images directly on OpenShift clusters. As the cloud-native ecosystem evolves, a new generation of build tooling has emerged.
+</p>
+<p>
+    <a href="https://github.com/redhat-openshift-builds/"><strong>OpenShift Builds</strong></a> is Red Hat's extensible build framework for building container images on OpenShift. It is based on <a href="https://github.com/shipwright-io/"><strong>Shipwright</strong></a>, the upstream open-source project that provides a vendor-neutral framework for building container images on Kubernetes.
+</p>
+<p>
+    Built on top of OpenShift Pipelines (Tekton), OpenShift Builds offers a flexible, extensible approach to container builds with enterprise support from Red Hat.
+</p>
+<p>
+    Today, we're excited to announce a <strong>Developer Preview</strong> of BuildConfig to OpenShift Builds migration support <strong>using </strong><a href="https://github.com/migtools/crane"><strong>Crane</strong></a>. This new upstream capability in Crane enables you to automatically convert your existing OpenShift BuildConfig resources to OpenShift Builds resources.
+</p>
+<hr>
+<h2>
+    What is Crane?
+</h2>
+<p>
+    <a href="https://github.com/migtools/crane">Crane</a> is an open-source migration tool under the <a href="https://www.konveyor.io/">Konveyor</a> community that helps application owners migrate Kubernetes workloads and their state between clusters. It is designed on an Extract, Transform, and Apply framework.
+</p>
+<p>
+    With this new BuildConfig conversion capability, Crane extends its migration toolkit to help organizations modernize their container build infrastructure.
+</p>
+<rh-alert state="caution">
+<h3 slot="header">
+    Developer Preview Notice
+</h3>
+<span class="rhalert-content">
+<p>
+    This BuildConfig migration feature is currently available as an upstream community capability in Crane. It is not yet included in official Red Hat product offerings. As a Developer Preview, it is intended for evaluation and feedback purposes and is not supported for production use.
+</p>
+</span></rh-alert>
+<hr>
+<h2>
+    What Gets Migrated?
+</h2>
+<p>
+    Crane handles the heavy lifting of converting your BuildConfigs to OpenShift Builds. Here's what's supported:
+</p>
+<h3>
+    Build Strategies
+</h3>
+<p>
+    Crane converts Docker strategy BuildConfigs to use the <strong>Buildah</strong> ClusterBuildStrategy, and Source strategy BuildConfigs to use <strong>Source to Image</strong> ClusterBuildStrategy.
+</p>
+<h3>
+    Source Types
+</h3>
+<p>
+    The tool intelligently handles all major source types:
+</p>
+<ul>
+    <li>
+        <strong>Git Sources</strong>: Full support including repository URL, branch/tag references, and clone secrets
+    </li>
+    <li>
+        <strong>Binary Sources</strong>: Converted to Local source type with streaming support
+    </li>
+    <li>
+        <strong>Image Sources</strong>: Converted to OCI Artifact sources for image-based builds
+    </li>
+</ul>
+<h3>
+    Key Features Migrated
+</h3>
+<ul>
+    <li>
+        <strong>Environment Variables</strong> — Seamlessly transferred to Build spec
+    </li>
+    <li>
+        <strong>Build Arguments</strong> — Docker build args converted to ParamValues
+    </li>
+    <li>
+        <strong>Dockerfile Paths</strong> — Custom Dockerfile locations preserved
+    </li>
+    <li>
+        <strong>Git Proxy Configuration</strong> — HTTP/HTTPS proxy settings converted to environment variables
+    </li>
+    <li>
+        <strong>Source Secrets</strong> — Clone secrets for private Git repositories
+    </li>
+    <li>
+        <strong>Push Secrets</strong> — Registry authentication for image pushing
+    </li>
+    <li>
+        <strong>Context Directories</strong> — Build context paths maintained
+    </li>
+</ul>
+<hr>
+<h2>
+    How It Works
+</h2>
+<p>
+    The migration process follows this workflow:
+</p>
+<ol>
+    <li>
+        <strong>Discovery</strong>: Crane connects to your cluster and lists all BuildConfigs in the specified namespace
+    </li>
+    <li>
+        <strong>Analysis</strong>: Each BuildConfig is analyzed for its strategy type, source configuration, and output settings
+    </li>
+    <li>
+        <strong>Validation</strong>: Pull secrets are validated to ensure they contain the required credentials
+    </li>
+    <li>
+        <strong>Conversion</strong>: Resources are mapped to their OpenShift Builds equivalents
+    </li>
+</ol>
+<hr>
+<h2>
+    Getting Started
+</h2>
+<p>
+    Ready to try the Developer Preview? Here's how to get started:
+</p>
+<h3>
+    Prerequisites
+</h3>
+<ol>
+    <li>
+        OpenShift Pipelines installed on your cluster
+    </li>
+    <li>
+        OpenShift Builds installed on your cluster
+    </li>
+</ol>
+<hr>
+<h2>
+    Example: Migration of BuildConfig with Docker Strategy and Git Source
+</h2>
+<p>
+    Let's walk through a complete migration example step by step.
+</p>
+<h3>
+    Step 1: Create the BuildConfig
+</h3>
+<p>
+    Let's take an example of the following BuildConfig (<code>ruby_docker_git_buildconfig.yaml</code>):
+</p>
+<ul>
+    <li>
+        <code><strong>spec.source</strong></code> is of Git type and defines a GitHub URI and branch. It also defines context directory, inline Dockerfile, secrets, and configMaps which are available in the builder pod during the build process.
+    </li>
+    <li>
+        <code><strong>spec.strategy</strong></code> is of Docker type and defines a <code>from</code> image which overrides the builder image in the project's Dockerfile. It also defines a pull secret to pull images from a private registry, flags (<code>noCache</code>, <code>forcePull</code>, <code>imageOptimizationPolicy</code>), volumes, environment variables, and build args.
+    </li>
+</ul>
+<rh-alert state="info">
+<h3 slot="header">
+    Note
+</h3>
+<span class="rhalert-content">
+<p>
+    The <code>git.uri</code> field should point to the Git repository containing your application source code. In this example, <code>https://github.com/psrvere/ruby-hello-world</code> is a sample repository provided for demonstration purposes.
+</p>
+</span></rh-alert><rh-alert state="info">
+<h3 slot="header">
+    Note
+</h3>
+<span class="rhalert-content">
+<p>
+    The <code>from</code> field references a private registry image <code>quay.io/prathore/ruby-27:latest</code> which requires a <code>pullSecret</code> for authentication. When using your own BuildConfig, either replace this with your own private registry image along with a valid pull secret, or use a publicly accessible image and remove the <code>pullSecret</code> field.
+</p>
+</span></rh-alert><pre><code class="language-plaintext">apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: ruby-docker-git
+  namespace: default
+spec:
+  source:
+    type: Git
+    git:
+      ref: interim
+      uri: https://github.com/psrvere/ruby-hello-world
+    contextDir: .
+    dockerfile: |
+      FROM ruby:2.7
+      WORKDIR /app
+      COPY . .
+      RUN bundle install
+      EXPOSE 4567
+      CMD ["ruby", "app.rb"]
+    secrets:
+      - secret:
+          name: database-credentials
+        destinationDir: config
+    configMaps:
+      - configMap:
+          name: app-config
+        destinationDir: config
+  strategy:
+    type: Docker
+    dockerStrategy:
+      from:
+        kind: DockerImage
+        name: quay.io/prathore/ruby-27:latest
+      pullSecret:
+        name: registry-creds
+      noCache: true
+      env:
+        - name: RACK_ENV
+          value: production
+      forcePull: true
+      dockerfilePath: ./dockerfilelocation/Dockerfile
+      buildArgs:
+        - name: BUILD_VERSION
+          value: 1.0.0
+      imageOptimizationPolicy: SkipLayers
+      volumes:
+        - name: bundler-config
+          source:
+            type: Secret
+            secret:
+              secretName: bundler-secret
+          mounts:
+            - destinationPath: /workspace/Gemfile.lock</code></pre>
+<h3>
+    Step 2: Validate the BuildConfig
+</h3>
+<p>
+    Make sure the BuildConfig is valid and runs successfully. Ensure secrets and ConfigMaps are available in the cluster
+</p>
+<pre><code class="language-plaintext">oc create imagestream ruby-docker-git
+oc apply -f ruby_docker_git_buildconfig.yaml
+oc start-build ruby-docker-git
+oc get build</code></pre>
+<h3>
+    Step 3: Download Crane CLI
+</h3>
+<p>
+    Download the latest Crane CLI tool by running the following command:
+</p>
+<pre><code class="language-plaintext">curl -fsSL https://raw.githubusercontent.com/psrvere/download-crane/main/download-crane.sh | bash</code></pre>
+<p>
+This script will automatically detect your platform and download the appropriate Crane binary.
+</p>
+<p>
+Alternatively, you can manually download the binary for your platform from the <a href="https://github.com/migtools/crane/releases/">Crane Releases</a> page.
+</p>
+<h3>
+Step 4: Run the Migration
+</h3>
+<p>
+Run the migration with the following command:
+</p>
+<pre><code class="language-plaintext">crane convert -r BuildConfigs -n default</code></pre>
+<p>
+<strong>Flags:</strong>
+</p>
+<ul>
+    <li>
+<code>-r BuildConfigs</code> — Required for BuildConfig migration
+    </li>
+    <li>
+<code>-n default</code> — Specifies the namespace (mandatory)
+    </li>
+</ul>
+<p>
+The default behavior of the Crane CLI tool is to find all BuildConfigs in the provided namespace and migrate them to OpenShift Builds format.
+</p>
+<p>
+<strong>Output directories:</strong>
+</p>
+<ul>
+    <li>
+<code>./convert/buildconfigs/&lt;namespace&gt;/</code> — All extracted BuildConfigs
+    </li>
+    <li>
+<code>./convert/builds/&lt;namespace&gt;/</code> — All migrated Build resources and supporting files
+    </li>
+</ul>
+<p>
+You will see detailed logs for each BuildConfig. Here's an example output:
+</p>
+<pre><code class="language-plaintext">INFO Converting BuildConfigs in namespace: default 
+INFO Found 1 BuildConfig to convert              
+INFO -------------------------------------------------------- 
+INFO Processing BuildConfig: ruby-docker-git at index 0 
+INFO -------------------------------------------------------- 
+INFO Docker strategy detected                     
+WARN From Field in BuildConfig's Docker strategy is not yet supported in built-in Buildah ClusterBuildStrategy in Shipwright. RFE: https://issues.redhat.com/browse/BUILD-1746 
+WARN NoCache flag is not yet supported in the built-in Buildah ClusterBuildStrategy in Shipwright. RFE: https://issues.redhat.com/browse/BUILD-1578 
+INFO Processing Environment Variables             
+WARN ForcePull flag is not yet supported in the built-in Buildah ClusterBuildStrategy in Shipwright. RFE: https://issues.redhat.com/browse/BUILD-1580 
+INFO Processing Dockerfile path                   
+INFO Processing Build Args                        
+WARN ImageOptimizationPolicy (--squash) flag is not yet supported in the built-in Buildah ClusterBuildStrategy in Shipwright. RFE: https://issues.redhat.com/browse/BUILD-1581 
+WARN Unlike BuildConfig, Volumes have to be supported in the Buildah Strategy first in Shipwright. Please raise your requirements here: https://issues.redhat.com/browse/BUILD-1747 
+ERRO Inline Dockerfile is not supported in buildah strategy. Consider moving it to a separate file. 
+INFO Processing Git Source                        
+INFO Processing Git CloneSecret                   
+WARN ConfigMaps are not yet supported in Shipwright build environment. RFE: https://issues.redhat.com/browse/BUILD-1745 
+WARN Secrets are not yet supported in Shipwright build environment. RFE: https://issues.redhat.com/browse/BUILD-1744 
+WARN Push to Openshift ImageStreams is not yet supported in Shipwright. RFE: https://issues.redhat.com/browse/BUILD-1756</code></pre>
+<p>
+    <strong>Understanding the logs:</strong>
+</p>
+<ul>
+    <li>
+        <strong>INFO</strong> — Successfully migrated fields
+    </li>
+    <li>
+        <strong>WARN</strong> — Feature not yet supported but on the roadmap (includes RFE links)
+    </li>
+    <li>
+        <strong>ERRO</strong> — Feature not planned for support
+    </li>
+</ul>
+<p>
+    <strong>Generated OpenShift Build file:</strong>
+</p>
+<p>
+    The Build resource defines a ClusterBuildStrategy (Buildah), Git source with URL and branch, environment variables, build args, custom Dockerfile location, and output registry:
+</p>
+<pre><code class="language-plaintext">apiVersion: shipwright.io/v1beta1
+kind: Build
+metadata:
+  creationTimestamp: "2025-12-16T11:17:37Z"
+  name: ruby-docker-git
+  namespace: default
+spec:
+  env:
+    - name: RACK_ENV
+      value: production
+  output:
+    image: image-registry.openshift-image-registry.svc:5000/default/ruby-docker-git:latest
+  paramValues:
+    - name: dockerfile
+      value: dockerfilelocation/Dockerfile
+    - name: build-args
+      values:
+        - value: BUILD_VERSION=1.0.0
+  source:
+    git:
+      revision: interim
+      url: https://github.com/psrvere/ruby-hello-world
+    type: Git
+  strategy:
+    kind: ClusterBuildStrategy
+    name: buildah</code></pre>
+<h3>
+    Step 5: Run the Generated Build
+</h3>
+<p>
+    <strong>Review and modify if needed:</strong>
+</p>
+<p>
+    First, check if there's a need to modify generated files. In our case, we may need to modify the output image. Although ImageStreams have been migrated to a correct URL in the generated file, this feature is not fully supported yet (see warnings).
+</p>
+<p>
+    You can change the output image to any public registry.
+</p>
+<p>
+    <strong>Create a BuildRun resource</strong> (<code>ruby_docker_buildrun.yaml</code>):
+</p>
+<pre><code class="language-plaintext">apiVersion: shipwright.io/v1beta1
+kind: BuildRun
+metadata:
+  name: ruby-docker-buildrun
+  namespace: default
+spec:
+  build:
+    name: ruby-docker-git
+  serviceAccount: ruby-docker-git</code></pre>
+<p>
+    <strong>Run the BuildRun:</strong>
+</p>
+<pre><code class="language-plaintext">oc apply -f ruby_docker_buildrun.yaml
+oc get buildrun</code></pre>
+<hr>
+<p>
+    If you prefer video format, you can also view a video <a href="https://www.youtube.com/watch?v=6Z7brDRwF8s">demo</a>.
+</p>
+<hr>
+<h2>
+    Current Availability &amp; Support
+</h2>
+<p>
+    This BuildConfig migration capability is currently available as an <strong>upstream Developer Preview</strong> in the <a href="https://github.com/migtools/crane">Crane project</a>
+</p>
+<p>
+    This feature is not yet included in official Red Hat product offerings. We encourage you to try the Developer Preview and share your feedback as we work toward broader availability.
+</p>
+<p>
+    For questions or issues, please <a href="https://github.com/migtools/crane/issues">open an issue</a> on the Crane GitHub repository.
+</p>
+<hr>
+<h2>
+    Resources
+</h2>
+<ul>
+    <li>
+        <strong>Crane GitHub Repository</strong>: <a href="https://github.com/migtools/crane">https://github.com/migtools/crane</a>
+    </li>
+    <li>
+        <strong>Konveyor Community</strong>: <a href="https://www.konveyor.io/">https://www.konveyor.io/</a>
+    </li>
+    <li>
+        <strong>OpenShift Builds GitHub</strong>: <a href="https://github.com/redhat-openshift-builds/">https://github.com/redhat-openshift-builds/</a>
+    </li>
+    <li>
+        <strong>Shipwright (Upstream) GitHub</strong>: <a href="https://github.com/shipwright-io/">https://github.com/shipwright-io/</a>
+    </li>
+    <li>
+        <strong>Shipwright Documentation</strong>: <a href="https://shipwright.io/docs/">https://shipwright.io/docs/</a>
+    </li>
+    <li>
+        <strong>Crane Migration Demo</strong>: <a href="https://www.youtube.com/watch?v=6Z7brDRwF8s">https://www.youtube.com/watch?v=6Z7brDRwF8s</a>
+    </li>
+</ul>
+<hr>
