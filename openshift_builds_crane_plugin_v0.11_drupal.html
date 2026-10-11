@@ -1,0 +1,255 @@
+<p>In January we announced a developer preview of BuildConfig migration in Crane, in
+<a href="https://developers.redhat.com/articles/2026/01/27/migrate-buildconfig-resources-builds-red-hat-openshift-crane">Migrate BuildConfig resources to Builds for Red Hat OpenShift with Crane</a>.
+That post showed how to turn an OpenShift BuildConfig into a Shipwright Build, the resource
+that Builds for Red Hat OpenShift runs.</p>
+<p>The conversion code has since moved out of Crane into its own plugin,
+<a href="https://github.com/migtools/crane-plugin-buildconfig-to-builds">crane-plugin-buildconfig-to-builds</a>.
+Version <a href="https://github.com/migtools/crane-plugin-buildconfig-to-builds/releases/tag/v0.11.0">v0.11.0</a>
+is its first release. Crane installs it from its plugin index with one command.</p>
+<p>This post covers what changed since January, then walks one BuildConfig through the new flow
+until it builds an image on the target cluster.</p>
+<h2>What changed since January</h2>
+<p>In January you ran <code>crane convert</code>. The conversion now runs as a
+transform plugin inside Crane's usual export, transform and apply flow. That is the same flow
+Crane uses for the rest of a namespace, so the BuildConfigs move together with the Secrets,
+ConfigMaps and ServiceAccounts they need.</p>
+<p>You no longer need a download script.
+<code>crane plugin-manager add BuildConfigToBuildsPlugin</code> fetches the released binary for your
+platform.</p>
+<p>The plugin reads the exported files and writes new ones. It never
+contacts a cluster, so you can read every converted Build before anything reaches the target.</p>
+<p>When the plugin drops or changes a BuildConfig field, it adds
+a warning to the converted Build, in the <code>crane.konveyor.io/conversion-warnings</code> annotation.
+The same text goes to the log. Each warning has a numbered entry in the
+<a href="https://github.com/migtools/crane-plugin-buildconfig-to-builds/blob/v0.11.0/docs/support-matrix.md">support matrix</a>
+that says what happened and what to do by hand.</p>
+<p>v0.11.0 handles Git, binary and image sources. It also
+carries build args, environment variables, volumes, the builder image, output image labels,
+resource requests and limits, node selectors, timeouts and build history limits.</p>
+<p>A BuildConfig the plugin cannot convert does not stop the run. It stays in the output unchanged,
+with two annotations that say it was skipped or failed and why.</p>
+<h2>What gets converted</h2>
+<table>
+<thead>
+<tr>
+<th>BuildConfig strategy</th>
+<th>Builds for Red Hat OpenShift strategy</th>
+<th>Outcome</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Docker</td>
+<td><code>buildah</code></td>
+<td>converted</td>
+</tr>
+<tr>
+<td>Source (S2I)</td>
+<td><code>source-to-image</code></td>
+<td>converted</td>
+</tr>
+<tr>
+<td>Custom</td>
+<td>none</td>
+<td>skipped, left unchanged with annotations</td>
+</tr>
+<tr>
+<td>JenkinsPipeline</td>
+<td>none</td>
+<td>skipped, left unchanged with annotations</td>
+</tr>
+</tbody>
+</table>
+<p>The two strategy names are the ones the Builds for Red Hat OpenShift operator installs.</p>
+<h2>Prerequisites</h2>
+<ul>
+<li>A source cluster with the BuildConfigs you want to move, and <code>oc</code> access to it.</li>
+<li>A target cluster with the Builds for Red Hat OpenShift operator installed.</li>
+<li>Crane v0.11.0 or newer. Crane v0.11.0-alpha.1 also works. Earlier versions produce no Build.</li>
+</ul>
+<h2>Example: a Docker build with a Git source</h2>
+<p>This is the same Ruby application as in January. The BuildConfig builds
+<code>ruby-hello-world</code> from its own Dockerfile and pushes the image to an ImageStream. On the
+target cluster the image goes to an external registry instead.</p>
+<h3>Step 1: Look at the BuildConfig</h3>
+<p>On the source cluster, in namespace <code>buildconfig-test</code>:</p>
+<pre><code class="language-plaintext">apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: ruby-hello-world-docker
+  namespace: buildconfig-test
+  labels:
+    app: ruby-hello-world
+    build-type: docker
+spec:
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  source:
+    type: Git
+    git:
+      uri: https://github.com/openshift/ruby-hello-world.git
+      ref: master
+  output:
+    to:
+      kind: ImageStreamTag
+      name: ruby-hello-world:latest
+    pushSecret:
+      name: quay-push
+  triggers:
+    - type: ConfigChange
+</code></pre>
+<p><code>quay-push</code> is a Secret in the same namespace that holds the credential for <code>quay.io</code>.</p>
+<h3>Step 2: Install Crane</h3>
+<p>Download the binary for your platform from the
+<a href="https://github.com/migtools/crane/releases">Crane releases page</a>. On Linux on x86:</p>
+<pre><code class="language-plaintext">CRANE_VERSION=v0.11.0
+curl -Lo crane &quot;https://github.com/migtools/crane/releases/download/${CRANE_VERSION}/crane_linux_amd64&quot;
+chmod +x crane
+sudo mv crane /usr/local/bin/
+crane version
+</code></pre>
+<p>The other assets follow the pattern <code>crane_&lt;os&gt;_&lt;arch&gt;</code>, for example <code>crane_darwin_arm64</code>.</p>
+<h3>Step 3: Install the plugin</h3>
+<pre><code class="language-plaintext">crane plugin-manager add BuildConfigToBuildsPlugin
+crane plugin-manager list
+</code></pre>
+<p>The binary goes to <code>$HOME/.local/share/crane/plugins</code>, where <code>crane transform</code> finds it.</p>
+<h3>Step 4: Export, transform and write the output</h3>
+<p>Log in to the source cluster, then run:</p>
+<pre><code class="language-plaintext">crane export -n buildconfig-test
+
+crane transform KubernetesPlugin BuildConfigToBuildsPlugin \
+  --optional-flags '{&quot;registry-mapping&quot;:&quot;image-registry.openshift-image-registry.svc:5000=quay.io/myorg&quot;}'
+
+crane apply
+</code></pre>
+<p><code>crane export</code> saves every resource in the namespace to local files.</p>
+<p><code>crane transform</code> runs two plugins. <code>KubernetesPlugin</code> is built into Crane and removes fields
+such as <code>uid</code> and <code>status</code> that would stop a resource applying to another cluster.
+<code>BuildConfigToBuildsPlugin</code> converts the BuildConfigs.</p>
+<p>The <code>registry-mapping</code> flag moves the output image off the internal OpenShift registry, which
+may not exist on the target, and onto <code>quay.io/myorg</code>. Replace <code>myorg</code> with your organization.</p>
+<p><code>crane apply</code> writes the result to <code>output/</code>. It does not touch a cluster.</p>
+<h3>Step 5: Read the Build and its warnings</h3>
+<p>The Build is in
+<code>output/resources/buildconfig-test/Build_shipwright.io_v1beta1_buildconfig-test_ruby-hello-world-docker.yaml</code>:</p>
+<pre><code class="language-plaintext">apiVersion: shipwright.io/v1beta1
+kind: Build
+metadata:
+  name: ruby-hello-world-docker
+  namespace: buildconfig-test
+  annotations:
+    buildconfig-to-shipwright/conversion-outcome: converted-with-warnings
+    buildconfig-to-shipwright/original-triggers: '[{&quot;type&quot;:&quot;ConfigChange&quot;}]'
+    crane.konveyor.io/conversion-warnings: |-
+      ...
+spec:
+  output:
+    image: quay.io/myorg/buildconfig-test/ruby-hello-world:latest
+    pushSecret: quay-push
+  paramValues:
+  - name: dockerfile
+    value: Dockerfile
+  retention:
+    failedLimit: 5
+    succeededLimit: 5
+  source:
+    type: Git
+    git:
+      url: https://github.com/openshift/ruby-hello-world.git
+      revision: master
+  strategy:
+    kind: ClusterBuildStrategy
+    name: buildah
+</code></pre>
+<p>The Docker strategy became the <code>buildah</code> strategy. The Dockerfile path became a parameter. The
+Git source, the push secret and the labels carried over. The ImageStream output became a
+registry address.</p>
+<p>The <code>conversion-warnings</code> annotation lists four things this BuildConfig lost:</p>
+<ul>
+<li>The image now goes to Quay, so the ImageStream on the source cluster stops updating. A
+  Deployment that rolled out on that ImageStream needs the new image address.</li>
+<li>The <code>Serial</code> run policy is gone. BuildRuns, the objects that run a Build, run at the same time.</li>
+<li>The <code>ConfigChange</code> trigger is gone, so the first build does not start on its own.</li>
+<li>The trigger summary: no trigger works in Shipwright today.</li>
+</ul>
+<p>Read these before you apply. They are the to-do list for this Build.</p>
+<h3>Step 6: Apply to the target cluster and run the build</h3>
+<p>Log in to the target cluster:</p>
+<pre><code class="language-plaintext">oc apply -R -f output/resources/
+
+oc wait --for=jsonpath='{.status.registered}'=True \
+  build.shipwright.io/ruby-hello-world-docker -n buildconfig-test --timeout=120s
+</code></pre>
+<p>Write <code>build.shipwright.io</code>, not <code>build</code>. On OpenShift the short name points at the OpenShift
+Build API.</p>
+<p>The apply may report an error for an <code>ImageTag</code> resource: <code>spec is a required field during
+creation</code>. Crane exports it along with the ImageStream, and the API refuses it on create. The
+Build does not use it, so you can ignore the error or delete that file before you apply.</p>
+<p>The trigger is gone, so start the first build yourself:</p>
+<pre><code class="language-plaintext">cat &lt;&lt;'EOF' | oc create -f -
+apiVersion: shipwright.io/v1beta1
+kind: BuildRun
+metadata:
+  generateName: ruby-hello-world-docker-
+  namespace: buildconfig-test
+spec:
+  build:
+    name: ruby-hello-world-docker
+EOF
+
+oc get buildrun -n buildconfig-test -w
+</code></pre>
+<p>The BuildRun runs as the <code>pipeline</code> service account, which the operator sets up. When it
+reaches <code>Succeeded</code>, the image is in <code>quay.io/myorg/buildconfig-test/ruby-hello-world:latest</code>.</p>
+<p>The run takes about a minute:</p>
+<pre><code class="language-plaintext">NAME                            SUCCEEDED   REASON      STARTTIME   COMPLETIONTIME
+ruby-hello-world-docker-6bddt   True        Succeeded   62s         1s
+</code></pre>
+<h2>What the plugin cannot convert</h2>
+<p>Some BuildConfig features have no equivalent in Builds for Red Hat OpenShift today. The main
+ones:</p>
+<ul>
+<li>Custom and JenkinsPipeline strategies are skipped. Move a Jenkins pipeline to
+  OpenShift Pipelines.</li>
+<li>Webhook, ImageChange and ConfigChange triggers are dropped. The plugin keeps
+  them in an annotation. The
+  <a href="https://github.com/migtools/crane-plugin-buildconfig-to-builds/blob/v0.11.0/docs/trigger-migration.md">trigger migration guide</a>
+  shows how to start builds from a webhook listener, a Pipeline or a CronJob.</li>
+<li>Post-commit hooks are dropped. Run your tests as a Pipeline step after the build.</li>
+<li>Binary builds convert, but each build starts with <code>shp build upload</code> instead of
+  <code>oc start-build --from-dir</code>.</li>
+<li>Secrets and ConfigMaps used as build input need a copy of the build strategy with
+  an extra volume. The
+  <a href="https://github.com/migtools/crane-plugin-buildconfig-to-builds/blob/v0.11.0/docs/volume-migration.md">volume migration guide</a>
+  has the steps.</li>
+</ul>
+<p>The full list, with a workaround for each item and what is planned, is on the
+<a href="https://github.com/migtools/crane-plugin-buildconfig-to-builds/blob/v0.11.0/docs/known-limitations.md">known limitations</a>
+page.</p>
+<h2>More examples</h2>
+<p>The plugin repository has
+<a href="https://github.com/migtools/crane-plugin-buildconfig-to-builds/tree/v0.11.0/docs/examples">four worked examples</a>.
+Each one has the input BuildConfig, the flags, the exact output and the steps on the target
+cluster. They cover an S2I build whose builder image is in an ImageStream, a binary build fed
+by a directory upload, and a Docker build that loses several fields. A test checks their
+output on every change to the plugin, so they stay correct.</p>
+<h2>Current availability and support</h2>
+<p>The plugin is an upstream release in the Konveyor Crane project. It is not yet part of a
+supported Red Hat product. We are working toward general availability and want to hear how it
+handles your BuildConfigs.</p>
+<p>Open an issue on the
+<a href="https://github.com/migtools/crane-plugin-buildconfig-to-builds/issues">plugin repository</a>
+with the BuildConfig, with names and secrets removed, and the warnings you got.</p>
+<h2>Resources</h2>
+<ul>
+<li><a href="https://developers.redhat.com/articles/2026/01/27/migrate-buildconfig-resources-builds-red-hat-openshift-crane">January post: Migrate BuildConfig resources to Builds for Red Hat OpenShift with Crane</a></li>
+<li><a href="https://github.com/migtools/crane-plugin-buildconfig-to-builds/releases/tag/v0.11.0">Plugin v0.11.0 release notes</a></li>
+<li><a href="https://github.com/migtools/crane-plugin-buildconfig-to-builds/blob/v0.11.0/README.md">Plugin README</a></li>
+<li><a href="https://github.com/migtools/crane-plugin-buildconfig-to-builds/blob/v0.11.0/docs/support-matrix.md">Support matrix: every BuildConfig field</a></li>
+<li><a href="https://github.com/migtools/crane-plugin-buildconfig-to-builds/blob/v0.11.0/docs/known-limitations.md">Known limitations</a></li>
+<li><a href="https://github.com/migtools/crane">Crane</a></li>
+<li><a href="https://shipwright.io/">Shipwright</a></li>
+</ul>
